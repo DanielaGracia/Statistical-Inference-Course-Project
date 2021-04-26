@@ -1,0 +1,247 @@
+---
+title: 'Statistical Inference Course Project Part 2: Basic Inferential Data Analysis'
+author: "Daniela Gracia"
+geometry: left=1.5cm,right=1.5cm,top=.7cm,bottom=1.5cm
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+### Synopsis 
+In this project we will analyze the ToothGrowth data from the R datasets package. We will **1)** perform some basic exploratory data analysis and provide a basic summary of the data **2)** Use confidence intervals and hypothesis tests to compare tooth growth by supp and dose and **3)** state our conclusions. Our main goal is to answer the question **¿Does delivery method and/or dosage affect tooth growth in guinea pigs?**
+   
+### Data Processing
+In this section we will **1)** load the data and perform **2)** exploratory data analysis and a summary of the data.    
+   
+#### Loading the data    
+First we load the data:
+```{r chunk1, echo=TRUE}
+# load the necessary library and data
+library(datasets)
+data("ToothGrowth")
+```
+#### Exploratory data analisys and summary  
+    
+This data set documents the effect of vitamin C on tooth growth in guinea pigs. Lets take a look at its structure: 
+```{r chunk2, echo=FALSE}
+# first we see the structure of the data
+str(ToothGrowth)
+```
+We can see it has 60 observations for 3 variables: *len*, *sup* and *dose*: **len:** numeric, tooth length. **sup:** factor, supplement type, VC (ascorbic acid - vitamin c) or OJ (orange juice). **dose:** numeric, dose of the supplement in milligrams per day. Now we will create a table of sup vs dose to better understand the structure of the data:
+```{r chunk3, echo=FALSE}
+# create table
+table(ToothGrowth$supp,ToothGrowth$dose)
+```
+We can see that for each of the two supplement types, 3 different doses were administered. For a total of ten subjects for each combination and a total of 60 subjects. Now to visualize the distribution of the data we will plot dose vs len for each of the supplement types. We observe two main things: 1) the higher the dose the higher the tooth growth for both supplement types, 2) there seems to be more tooth growth for the orange juice supplement than for the vitamin C supplement. Finally we will create tables to show **A)** Average tooth length for each supplement and **B)** Average tooth length for each dosage.
+```{r chunk4, echo=FALSE, fig.height = 3, message=FALSE,fig.align="left"}
+# load packages
+library(viridis)
+library(ggplot2)
+# transform dose variable into a factor
+ToothGrowth$dose <- as.factor(ToothGrowth$dose)
+# new facet label names for supp variable
+supp.labs <- c("Orange Juice", "Vitamin C")
+names(supp.labs) <- c("OJ", "VC")
+# create boxplot divided in facets by supplement type using ggplot2
+plot1 <- ggplot(ToothGrowth, aes(x=dose, y=len, fill=dose)) + 
+        geom_boxplot() + 
+        facet_grid(.~supp, labeller = labeller(supp = supp.labs)) +
+        geom_jitter(color="black", size=0.4, alpha=0.9) + 
+        scale_fill_viridis(discrete = TRUE, alpha=0.6) +
+        labs(x="dose (mg/day)",y="length",title="Toothgrowth of guinea pigs by supplement type") +
+        theme(plot.title = element_text(hjust = 0.5, size =10), 
+        axis.text.x = element_text(size = 7),
+        axis.text.y = element_text(size = 7))
+plot1
+```
+\footnotesize
+```{r chunk5, echo=FALSE, message=FALSE}
+# load necessary packages
+library(dplyr)
+library(knitr)
+# create table of supplement and average length
+supplement <- ToothGrowth %>% group_by(supp) %>% 
+        summarise(average_length = mean(len)) 
+colnames(supplement) <- c("supplement","average length")
+supplement <- as.data.frame(supplement)
+
+# create table of dosage and average length
+dosage <- ToothGrowth %>% group_by(dose) %>%       
+        summarise(average_length=mean(len))
+colnames(dosage) <- c("dose (mg/day)","average length")
+dosage <- as.data.frame(dosage)
+
+# calculate means
+meanoj <- round(supplement[[1,2]], digits = 2)
+meanvc <- round(supplement[[2,2]], digits = 2)
+half <- round(dosage[[1,2]], digits = 2)
+one <- round(dosage[[2,2]], digits = 2)
+two <- round(dosage[[3,2]], digits = 2)
+
+#display tables
+supplement
+dosage
+```
+\normalsize
+### Data Analysis
+In this section we will use hypothesis testing to study tooth growth by supp and dose. We will do this by assuming all of our variables are IID random variables, we also assume that the distribution of their averages follows a normal distribution and that the groups have different variance.
+    
+#### Tooth growth by supplement
+We know that the mean tooth length for orange juice (OJ) is *<span style="color:#dfa290">`r meanoj`</span>* and that the mean tooth length for vitamin c (VC) is *<span style="color:#dfa290">`r meanvc`</span>*, knowing this we will test the following null and alternative hypothesis for both groups (group 1 = OJ, group 2 = VC):
+
+**Null Hypothesis:** The type of supplement does not have an effect on tooth growth: $H_0: \mu_1=\mu_2$.    
+**Alternative Hypothesis:** The type of supplement has an effect on tooth growth: $H_a: \mu_1\neq\mu_2$.    
+Now we will use the t.test() function to test this.
+\footnotesize
+```{r chunk6, echo=FALSE}
+t.test(data=ToothGrowth, alternative = "two.sided",len~supp, paired=FALSE, var.equal=FALSE)
+pval1 <- round(t.test(data=ToothGrowth, alternative = "two.sided",len~supp, paired=FALSE, var.equal=FALSE)$p.value*100, digits=2)
+```
+\normalsize
+From this results and confidence interval we see that the p-value (*<span style="color:#dfa290">`r pval1`%</span>*) is higher than the type I error rate $\alpha=5\%$ and the confidence interval contains zero which means there is a possibility that $\mu_1-\mu_2=0$. Therefore we fail to reject the null hypothesis and conclude that the type of supplement does not have an effect on tooth growth for this data. We will know run the same test using only the information for 0.5 and 1 mg/day dosage options.
+\footnotesize
+```{r chunk6.1, echo=FALSE}
+exclude_2dose <- filter(ToothGrowth,dose!="2")
+t.test(data=exclude_2dose, alternative = "two.sided",len~supp, paired=FALSE, var.equal=FALSE)
+pval2 <- round(t.test(data=exclude_2dose, alternative = "two.sided",len~supp, paired=FALSE, var.equal=FALSE)$p.value*100, digits=2)
+```
+\normalsize
+In this case the p-value (*<span style="color:#dfa290">`r pval2`%</span>*) is much smaller, and significantly less than $\alpha$ and the confidence interval does not contain zero. Therefore in this case we reject the null hypothesis and accept the alternative hypothesis $H_a: \mu_1\neq\mu_2$. We can conclude that the type of supplement does have an effect on tooth growth and particularly the orange juice supplement has a higher impact. 
+  
+#### Tooth growth by dosage
+We know that the mean tooth growth for 0.5 mg dose is *<span style="color:#dfa290">`r half`</span>*, for 1 mg dose it is *<span style="color:#dfa290">`r one`</span>*, and for the 2 mg dose it is *<span style="color:#dfa290">`r two`</span>*. Knowing this we will test the following null and alternative hypothesis for both groups (group 1 = 0.5 mg dose, group 2 = 1 mg dose and group 3 = 2 mg dose):
+
+**Null Hypothesis:** The dosage does not have an effect on tooth growth: $H_0: \mu_1=\mu_2;\ \mu_2=\mu_3;\ \mu_1=\mu_3$.    
+**Alternative Hypothesis:** The dosage has an effect on tooth growth: $H_a: \mu_3>\mu_2>\mu_1$.   
+  
+First we test **$H_a: \mu_2>\mu_1$**
+\footnotesize
+```{r chunk7, echo=FALSE}
+# create a data frame for each dosage
+half_dose <- filter(ToothGrowth,ToothGrowth$dose=="0.5")
+one_dose <- filter(ToothGrowth,ToothGrowth$dose=="1")
+two_dose <- filter(ToothGrowth,ToothGrowth$dose=="2")
+
+#run t.test()
+t.test(half_dose$len, one_dose$len, paired=FALSE, var.equal=FALSE,alternative ="l" )
+```
+\normalsize
+Second we test **$H_a: \mu_3>\mu_2$**
+\footnotesize
+```{r chunk8, echo=FALSE}
+#run t.test()
+t.test(one_dose$len, two_dose$len, paired=FALSE, var.equal=FALSE,alternative ="l" )
+```
+\normalsize
+Finally we test **$H_a: \mu_3>\mu_1$**
+\footnotesize
+```{r chunk9, echo=FALSE}
+#run t.test()
+t.test(half_dose$len, two_dose$len, paired=FALSE, var.equal=FALSE,alternative ="l" )
+quantile_95<-round(pt(.975,37), digits=2)
+```
+\normalsize
+For all the tests above the p-value is near zero, the t-statistic is greater than the .975th quantile (*<span style="color:#dfa290">`r quantile_95`</span>*) and the confidence interval does not contain zero, therefore we reject the null hypothesis. We can conclude that we accept the alternative hypothesis $H_a: \mu_3>\mu_2>\mu_1$ and therefore dosage does have an effect on tooth growth. 
+
+### Conclusions
+Assuming our variables are IID and behave as predicted by the CLT. Our analysis showed the following: **1)** Dosage has an effect on tooth growth, specifically the higher the dosage the higher the tooth length. **2)** Delivery method has an effect on tooth growth, specifically orange juice is more effective than vitamin c in the 0.5 and 1 mg dosage.
+
+### Appendix
+Below is all the code used to make calculations and create figures in this report.
+```{r ap1, warning=FALSE, echo = TRUE, results="hide", message=FALSE, fig.show='hide'}
+# first we see the structure of the data
+str(ToothGrowth)
+```
+
+```{r ap2, warning=FALSE, echo = TRUE, results="hide", message=FALSE, fig.show='hide'}
+# create table
+table(ToothGrowth$supp,ToothGrowth$dose)
+```
+
+```{r ap3, warning=FALSE, echo = TRUE, results="hide", message=FALSE, fig.show='hide'}
+# load packages
+library(viridis)
+library(ggplot2)
+
+# transform dose variable into a factor
+ToothGrowth$dose <- as.factor(ToothGrowth$dose)
+
+# new facet label names for supp variable
+supp.labs <- c("Orange Juice", "Vitamin C")
+names(supp.labs) <- c("OJ", "VC")
+
+# create boxplot divided in facets by supplement type using ggplot2
+plot1 <- ggplot(ToothGrowth, aes(x=dose, y=len, fill=dose)) + 
+        geom_boxplot() + 
+        facet_grid(.~supp, labeller = labeller(supp = supp.labs)) +
+        geom_jitter(color="black", size=0.4, alpha=0.9) + 
+        scale_fill_viridis(discrete = TRUE, alpha=0.6) +
+        labs(x="dose (mg/day)",y="length",title="Toothgrowth of guinea pigs by supplement type") +
+        theme(plot.title = element_text(hjust = 0.5, size =13), 
+        axis.text.x = element_text(size = 10),
+        axis.text.y = element_text(size = 10))
+plot1
+```
+
+```{r ap4, warning=FALSE, echo = TRUE, results="hide", message=FALSE, fig.show='hide'}
+# load necessary packages
+library(dplyr)
+library(knitr)
+
+# create table of supplement and average length
+supplement <- ToothGrowth %>% group_by(supp) %>% 
+        summarise(average_length = mean(len)) 
+colnames(supplement) <- c("supplement","average length")
+supplement <- as.data.frame(supplement)
+
+# create table of dosage and average length
+dosage <- ToothGrowth %>% group_by(dose) %>%       
+        summarise(average_length=mean(len))
+colnames(dosage) <- c("dose (mg/day)","average length")
+dosage <- as.data.frame(dosage)
+
+# calculate means
+meanoj <- round(supplement[[1,2]], digits = 2)
+meanvc <- round(supplement[[2,2]], digits = 2)
+half <- round(dosage[[1,2]], digits = 2)
+one <- round(dosage[[2,2]], digits = 2)
+two <- round(dosage[[3,2]], digits = 2)
+
+# display tables
+supplement
+dosage
+```
+
+```{r ap5, warning=FALSE, echo = TRUE, results="hide", message=FALSE, fig.show='hide'}
+# run t.test()
+t.test(data=ToothGrowth, alternative = "two.sided",len~supp, paired=FALSE, var.equal=FALSE)
+pval1 <- round(t.test(data=ToothGrowth, alternative = "two.sided",len~supp, paired=FALSE, var.equal=FALSE)$p.value*100, digits=2)
+```
+
+```{r ap6, warning=FALSE, echo = TRUE, results="hide", message=FALSE, fig.show='hide'}
+# run t.test()
+exclude_2dose <- filter(ToothGrowth,dose!="2")
+t.test(data=exclude_2dose, alternative = "two.sided",len~supp, paired=FALSE, var.equal=FALSE)
+pval2 <- round(t.test(data=exclude_2dose, alternative = "two.sided",len~supp, paired=FALSE, var.equal=FALSE)$p.value*100, digits=2)
+```
+
+```{r ap7, warning=FALSE, echo = TRUE, results="hide", message=FALSE, fig.show='hide'}
+# create a data frame for each dosage
+half_dose <- filter(ToothGrowth,ToothGrowth$dose=="0.5")
+one_dose <- filter(ToothGrowth,ToothGrowth$dose=="1")
+two_dose <- filter(ToothGrowth,ToothGrowth$dose=="2")
+
+#run t.test()
+t.test(half_dose$len, one_dose$len, paired=FALSE, var.equal=FALSE,alternative ="l" )
+```
+
+```{r ap8, warning=FALSE, echo = TRUE, results="hide", message=FALSE, fig.show='hide'}
+#run t.test()
+t.test(one_dose$len, two_dose$len, paired=FALSE, var.equal=FALSE,alternative ="l" )
+```
+
+```{r ap9, warning=FALSE, echo = TRUE, results="hide", message=FALSE, fig.show='hide'}
+#run t.test()
+t.test(half_dose$len, two_dose$len, paired=FALSE, var.equal=FALSE,alternative ="l" )
+quantile_95<-round(pt(.975,37), digits=2)
+```
